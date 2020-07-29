@@ -21,7 +21,7 @@ using namespace SoEiXRS;
 
 namespace SoEiXRS {
 enum {
-	energyScan, collimatorScan
+	unknownTarget = 0, energyScan, collimatorScan
 } task;
 }
 
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 
 	if (argc < 9) {
 		std::cout << "Expects at least 9 arguments: " << std::endl;
-		std::cout << "  task - \"energyScan\" or \"collimatorScan\"";
+		std::cout << " task: \"energyScan\" or \"collimatorScan\"" << std::endl;
 		std::cout << "  output file" << std::endl;
 		std::cout << "  max energy [keV] or only Energy for collimatorScan" << std::endl;
 		std::cout << "  bin size [keV] or [cm] for collimatorScan" << std::endl;
@@ -39,15 +39,17 @@ int main(int argc, char* argv[]) {
 		std::cout << "  detector size [cm] (assuming a square detector)" << std::endl;
 		std::cout << " *Filter Material, e.g. G4_W, G4_Mo, G4_Au" << std::endl;
 		std::cout << " *Filter Thickness [mm]" << std::endl;
-		std::cout << "  repeat * n>=1 times" << std::endl;
+		std::cout << "  "<< std::endl;
 		return 0;
 	}
 
-	std::string strTask = argv[2];
+	std::string strTask = argv[1];
 	if (strTask == "energyScan") {
 		task = energyScan;
-	} else if (strTask == "energyScan") {
+	} else if (strTask == "collimatorScan") {
 		task = collimatorScan;
+	} else {
+		task = unknownTarget;
 	}
 	std::string outputFileName = argv[2];
 	double maxEnergy = std::stod(argv[3]);
@@ -118,39 +120,134 @@ int main(int argc, char* argv[]) {
 	switch (task) {
 	case energyScan: {
 
-		std::vector<std::vector<double>> responseMatrix;
+		std::vector<std::vector<double>> responseElectronMatrix;
+		std::vector<std::vector<double>> responsePhotonMatrix;
 
-		responseMatrix.push_back(std::vector<double>(maxEnergy / binSize, 0));
+		responseElectronMatrix.push_back(std::vector<double>(maxEnergy / binSize, 0));
+		responsePhotonMatrix.push_back(std::vector<double>(maxEnergy / binSize, 0));
 
 		for (double inputEnergy = binSize; inputEnergy < maxEnergy;
 				inputEnergy += binSize) {
 
-			std::vector<double>* resultVector = new std::vector<double>();
+			std::vector<double>* resultElectronVector = new std::vector<double>();
+			std::vector<double>* resultPhotonVector = new std::vector<double>();
 
-			steppingAction->resultVector = resultVector;
+			steppingAction->resultElectronPosEnergy = resultElectronVector;
+			steppingAction->resultPhotonPosEnergy = resultPhotonVector;
 
-			primaryGeneratorAction->nd = std::uniform_real_distribution<double>(
+			primaryGeneratorAction->energyDist = std::uniform_real_distribution<double>(
 					inputEnergy - (binSize / 2), inputEnergy + (binSize / 2));
 
 			std::cout << "current energy: " << inputEnergy << "keV"
 					<< std::endl;
-			int runs = 1000;
+			int runs = 500000;
 			for (int r = 0; r < runs; r++) {
 				// start a run
-				if (r % 100 == 0) {
+				if (r % 1000 == 0) {
 					std::cout << ".";
 					std::cout.flush();
 				}
 				runManager->BeamOn(1);
 			}
 
-			std::vector<double> outputVec(maxEnergy / binSize, 0);
+			std::vector<double> outputElectronVec(maxEnergy / binSize, 0);
+			std::vector<double> outputPhotonVec(maxEnergy / binSize, 0);
 
-			for (auto d : *resultVector) {
+			for (auto d : *resultElectronVector) {
 				int pos = (d + binSize / 2.) / binSize;
 
+				if (pos >= 0 && pos < outputElectronVec.size()) {
+					outputElectronVec.at(pos) += 1;
+				}
+			}
+			for (auto d : *resultPhotonVector) {
+				int pos = (d + binSize / 2.) / binSize;
+
+				if (pos >= 0 && pos < outputPhotonVec.size()) {
+					outputPhotonVec.at(pos) += 1;
+				}
+			}
+			responseElectronMatrix.push_back(outputElectronVec);
+			responsePhotonMatrix.push_back(outputPhotonVec);
+
+			//UI->ApplyCommand("/vis/viewer/rebuild");
+			//UI->ApplyCommand("/vis/viewer/flush");
+			std::cout << "  --> Electron count = " << resultElectronVector->size() << " / "
+					<< (PARTICLES_IN_GUN * runs) << std::endl;
+			std::cout << "  --> Photon count = " << resultPhotonVector->size() << " / "
+					<< (PARTICLES_IN_GUN * runs) << std::endl;
+			delete (resultElectronVector);
+			delete (resultPhotonVector);
+		}
+
+		std::cout << "writing output file" << std::endl;
+		std::ofstream outputFile(outputFileName + ".ele", std::ofstream::trunc);
+
+		for (auto line : responseElectronMatrix) {
+			for (auto d : line) {
+				outputFile << d << " ";
+			}
+			outputFile << std::endl;
+		}
+
+		outputFile.close();
+
+		std::ofstream outputFile2(outputFileName + ".pho", std::ofstream::trunc);
+
+		for (auto line : responsePhotonMatrix) {
+			for (auto d : line) {
+				outputFile2 << d << " ";
+			}
+			outputFile2 << std::endl;
+		}
+
+		outputFile2.close();
+
+		break;
+	}
+	case collimatorScan: {
+
+		std::vector<std::vector<double>> responseMatrix;
+
+		responseMatrix.push_back(std::vector<double>(100, 0));
+
+		primaryGeneratorAction->energyDist = std::uniform_real_distribution<double>(
+				maxEnergy - 0.001*keV, maxEnergy + 0.001*keV);
+
+		for (double thisCollSize = binSize; thisCollSize < filtCollSize; thisCollSize += binSize) {
+
+			std::vector<double>* resultVector = new std::vector<double>();
+
+			steppingAction->resultElectronPosEnergy = resultVector;
+			steppingAction->resultPhotonPosEnergy = resultVector;
+
+			std::cout << "current collimator size: " << thisCollSize << "cm" << std::endl;
+
+			primaryGeneratorAction->filtCollSize = thisCollSize;
+
+			primaryGeneratorAction->directDist = std::uniform_real_distribution<double>(
+					-atan(filtCollSize / (2 * distanceSourceFilter)),
+					+atan(filtCollSize / (2 * distanceSourceFilter)));
+
+			int runs = 500000;
+			for (int r = 0; r < runs; r++) {
+				// start a run
+				if (r % 1000 == 0) {
+					std::cout << ".";
+					std::cout.flush();
+				}
+				runManager->BeamOn(1);
+			}
+
+			double energyBinSize = maxEnergy/100;
+
+			std::vector<double> outputVec(100, 0);
+
+			for (auto d : *resultVector) {
+				int pos = (d + energyBinSize * 0.5) / energyBinSize;
+
 				if (pos >= 0 && pos < outputVec.size()) {
-					outputVec.at(pos) += 1;
+					outputVec.at(pos) += (thisCollSize*thisCollSize)/(filtCollSize*filtCollSize);
 				}
 			}
 			responseMatrix.push_back(outputVec);
@@ -163,7 +260,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		std::cout << "writing output file" << std::endl;
-		std::ofstream outputFile(outputFileName);
+		std::ofstream outputFile(outputFileName, std::ofstream::trunc);
 
 		for (auto line : responseMatrix) {
 			for (auto d : line) {
@@ -176,23 +273,15 @@ int main(int argc, char* argv[]) {
 
 		break;
 	}
-	case collimatorScan: {
-
-		break;
-	}
 	default:
 		std::cout << "cannot detect task" << std::endl;
 	}
 
 	std::string s;
 
+	std::cout << "done >";
+	std::cout.flush();
 	std::cin >> s;
-	/*while (s != "exit" && s != "e") {
-		//std::cin >> s;
-		//UI->ApplyCommand(s);
-		runManager->BeamOn(numberOfEvent);
-		//UI->ApplyCommand("/vis/viewer/rebuild");
-	}*/
 
 	// job termination
 	delete runManager;

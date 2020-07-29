@@ -24,7 +24,10 @@ class PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
     // method to access particle gun
     const G4ParticleGun* GetParticleGun() const { return fParticleGun; }
 
-    std::uniform_real_distribution<double> nd;
+    std::uniform_real_distribution<double> energyDist;
+	std::uniform_real_distribution<double> directDist;
+
+	double filtCollSize;
 
   private:
     G4ParticleGun*  fParticleGun; // pointer a to G4 gun class
@@ -32,10 +35,7 @@ class PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
 
     std::default_random_engine de; // the rng for the energy
 
-	std::uniform_real_distribution<double> ud;
-
 	double sourcePosition;
-	double filtCollSize;
 };
 
 } /* namespace SoEiXRS */

@@ -6,7 +6,7 @@ DetectorConstruction::DetectorConstruction(double distanceSourceFilter,
 		double distanceFilterDetect, double filtCollSize, double detSize,
 		std::vector<std::tuple<std::string, double>> filterMaterials) :
 		G4VUserDetectorConstruction(), nist(G4NistManager::Instance()), world_sizeXY(
-				filtCollSize * 3 * cm), world_sizeZ(
+				std::max(filtCollSize * 5 * cm, detSize * 20 * cm)), world_sizeZ(
 				std::max(distanceSourceFilter, distanceFilterDetect) * 2.1 * cm) {
 
 	/// https://books.google.de/books?id=8REhrrTKZKwC&pg=PA25#v=onepage&q&f=false
@@ -33,7 +33,7 @@ DetectorConstruction::DetectorConstruction(double distanceSourceFilter,
 
 	density = 1.290 * mg / cm3;
 	G4Material* vac = new G4Material("CustomVacuum", density, 2, kStateGas,
-			293.15 * kelvin, atmosphere / ((double) pow(10, 6)));
+			293.15 * kelvin, atmosphere / ((double) pow(10, (5+3))));
 	vac->AddElement(elN, 78.084 * perCent);
 	vac->AddElement(elO, 20.942 * perCent);
 
@@ -74,8 +74,8 @@ DetectorConstruction::DetectorConstruction(double distanceSourceFilter,
 	}
 
 	/// build the vacuum chamber
-	G4Box* vac_box = new G4Box("VacChamberBox", filtCollSize * 2 * cm,
-			filtCollSize * 2 * cm, distanceSourceFilter * cm);
+	G4Box* vac_box = new G4Box("VacChamberBox", world_sizeXY *0.99,
+			world_sizeXY *0.99, distanceSourceFilter * cm);
 	G4LogicalVolume* vac_vol = new G4LogicalVolume(vac_box, vac,
 			"VacChamberVolume");
 	G4VPhysicalVolume* vac_physvol = new G4PVPlacement(0,

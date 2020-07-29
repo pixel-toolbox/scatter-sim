@@ -25,20 +25,29 @@ void SteppingAction::UserSteppingAction(const G4Step* step) {
 		fScoringVolume = detectorConstruction->GetScoringVolume();
 	}
 
+	G4StepPoint* thisStep = step->GetPostStepPoint();
+	if (thisStep == NULL) return;
+	const G4TouchableHandle postStepPoint = thisStep->GetTouchableHandle();
+	G4VPhysicalVolume* touchableHandle = postStepPoint->GetVolume();
+	if (touchableHandle == NULL) return;
+
 	// get volume of the current step
-	G4LogicalVolume* volume =
-			step->GetPreStepPoint()->GetTouchableHandle()->GetVolume()->GetLogicalVolume();
+	G4LogicalVolume* volume = touchableHandle->GetLogicalVolume();
+	if (volume == NULL) return;
 
 	// check if we are in scoring volume
 	if (volume != fScoringVolume)
 		return;
 
-	auto energy = step->GetTrack()->GetKineticEnergy() / keV;
+	auto energy = step->GetPreStepPoint()->GetKineticEnergy() / keV;
 
-	//std::cout << energy << std::endl;
-	resultVector->push_back(energy);
-
-	//std::cout << "energy: " << energy << std::endl;
+	if (step->GetTrack()->GetDefinition() == G4Gamma::GammaDefinition()) {
+		resultPhotonPosEnergy->push_back(energy);
+	} else if (step->GetTrack()->GetDefinition() == G4Electron::ElectronDefinition()) {
+		resultElectronPosEnergy->push_back(energy);
+	} else {
+		std::cout << "???? energy: " << energy << std::endl;
+	}
 
 	step->GetTrack()->SetTrackStatus(fStopAndKill);
 }

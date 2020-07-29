@@ -21,7 +21,8 @@ class SteppingAction : public G4UserSteppingAction {
 
 		virtual void UserSteppingAction(const G4Step*);
 
-	    std::vector<double>* resultVector = NULL;
+	    std::vector<double>* resultElectronPosEnergy = NULL;
+	    std::vector<double>* resultPhotonPosEnergy = NULL;
 
 	private:
 	    G4LogicalVolume* fScoringVolume = NULL;
