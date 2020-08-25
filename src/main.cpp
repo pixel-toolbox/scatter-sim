@@ -209,10 +209,10 @@ int main(int argc, char* argv[]) {
 
 		std::vector<std::vector<double>> responseMatrix;
 
-		responseMatrix.push_back(std::vector<double>(100, 0));
+		responseMatrix.push_back(std::vector<double>(102, 0));
 
 		primaryGeneratorAction->energyDist = std::uniform_real_distribution<double>(
-				maxEnergy - 0.001*keV, maxEnergy + 0.001*keV);
+				maxEnergy - 0.001, maxEnergy + 0.001);
 
 		for (double thisCollSize = binSize; thisCollSize < filtCollSize; thisCollSize += binSize) {
 
@@ -226,8 +226,8 @@ int main(int argc, char* argv[]) {
 			primaryGeneratorAction->filtCollSize = thisCollSize;
 
 			primaryGeneratorAction->directDist = std::uniform_real_distribution<double>(
-					-atan(filtCollSize / (2 * distanceSourceFilter)),
-					+atan(filtCollSize / (2 * distanceSourceFilter)));
+					-atan(thisCollSize / (2 * distanceSourceFilter)),
+					+atan(thisCollSize / (2 * distanceSourceFilter)));
 
 			int runs = 500000;
 			for (int r = 0; r < runs; r++) {
@@ -241,13 +241,13 @@ int main(int argc, char* argv[]) {
 
 			double energyBinSize = maxEnergy/100;
 
-			std::vector<double> outputVec(100, 0);
+			std::vector<double> outputVec(102, 0);
 
 			for (auto d : *resultVector) {
 				int pos = (d + energyBinSize * 0.5) / energyBinSize;
 
-				if (pos >= 0 && pos < outputVec.size()) {
-					outputVec.at(pos) += (thisCollSize*thisCollSize)/(filtCollSize*filtCollSize);
+				if (pos > 0 && pos < outputVec.size()) {
+					outputVec.at(pos) += 1;
 				}
 			}
 			responseMatrix.push_back(outputVec);
@@ -277,11 +277,11 @@ int main(int argc, char* argv[]) {
 		std::cout << "cannot detect task" << std::endl;
 	}
 
-	std::string s;
+	/*std::string s;
 
 	std::cout << "done >";
 	std::cout.flush();
-	std::cin >> s;
+	std::cin >> s;*/
 
 	// job termination
 	delete runManager;
